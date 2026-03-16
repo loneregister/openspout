@@ -198,7 +198,21 @@ final readonly class WorksheetManager implements WorksheetManagerInterface
         } elseif ($cell instanceof Cell\NumericCell) {
             $cellXML .= '><v>'.$cell->getValue().'</v></c>';
         } elseif ($cell instanceof Cell\FormulaCell) {
-            $cellXML .= '><f>'.$this->stringsEscaper->escape(substr($cell->getValue(), 1)).'</f></c>';
+            $computed = $cell->getComputedValue();
+            // Use ENT_XML1|ENT_NOQUOTES so that sheet references like 'Sheet Name'!A:B
+            // are preserved as literal apostrophes in the <f> element. ENT_QUOTES (used by
+            // stringsEscaper) converts single quotes to &#039; which spreadsheet apps do not
+            // reliably decode inside formula text, breaking cross-sheet VLOOKUP references.
+            $fXml = htmlspecialchars(substr($cell->getValue(), 1), ENT_XML1 | ENT_NOQUOTES, 'UTF-8');
+            if ($computed !== null) {
+                if (is_bool($computed)) {
+                    $cellXML .= ' t="b"><f>'.$fXml.'</f><v>'.(int) $computed.'</v></c>';
+                } else {
+                    $cellXML .= '><f>'.$fXml.'</f><v>'.$this->stringsEscaper->escape((string) $computed).'</v></c>';
+                }
+            } else {
+                $cellXML .= '><f>'.$fXml.'</f></c>';
+            }
         } elseif ($cell instanceof Cell\DateTimeCell) {
             $cellXML .= '><v>'.DateHelper::toExcel($cell->getValue()).'</v></c>';
         } elseif ($cell instanceof Cell\DateIntervalCell) {
